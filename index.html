@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4F46E5">
+    <title>EDUCA - Sistema de Gestión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        .loading { opacity: 0.6; pointer-events: none; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
+    <!-- LOGIN VIEW -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-indigo-600">EDUCA</h1>
+                <p class="text-gray-500 mt-2">Sistema de Gestión Educativa</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="login-email" required 
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                    <input type="password" id="login-password" required 
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <button type="submit" id="login-btn"
+                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    Ingresar
+                </button>
+            </form>
+            <p id="login-error" class="text-red-500 text-sm text-center mt-4 hidden"></p>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-view" class="hidden">
+        <!-- Header -->
+        <header class="bg-indigo-600 text-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                <h1 class="text-xl font-bold">EDUCA</h1>
+                <div class="flex items-center gap-4">
+                    <span id="user-name" class="text-sm hidden sm:block"></span>
+                    <button id="logout-btn" class="text-sm bg-indigo-700 px-3 py-1 rounded hover:bg-indigo-800">
+                        Salir
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex space-x-1 overflow-x-auto">
+                    <button data-view="dashboard" class="nav-btn px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 whitespace-nowrap">
+                        Dashboard
+                    </button>
+                    <button data-view="students" class="nav-btn px-4 py-3 text-sm font-medium text-gray-500 hover:text-indigo-600 whitespace-nowrap">
+                        Estudiantes
+                    </button>
+                    <button data-view="courses" class="nav-btn px-4 py-3 text-sm font-medium text-gray-500 hover:text-indigo-600 whitespace-nowrap">
+                        Cursos
+                    </button>
+                    <button data-view="payments" class="nav-btn px-4 py-3 text-sm font-medium text-gray-500 hover:text-indigo-600 whitespace-nowrap">
+                        Pagos
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- CONTENT VIEWS -->
+        <main class="max-w-7xl mx-auto px-4 py-6">
+            
+            <!-- DASHBOARD VIEW -->
+            <div id="dashboard-view" class="view-section space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <p class="text-gray-500 text-sm">Estudiantes Activos</p>
+                        <p id="stat-active-students" class="text-3xl font-bold text-indigo-600 mt-1">-</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <p class="text-gray-500 text-sm">Cursos Activos</p>
+                        <p id="stat-active-courses" class="text-3xl font-bold text-green-600 mt-1">-</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <p class="text-gray-500 text-sm">Pagos Hoy</p>
+                        <p id="stat-today-payments" class="text-3xl font-bold text-blue-600 mt-1">-</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <p class="text-gray-500 text-sm">Recaudado Mes</p>
+                        <p id="stat-month-revenue" class="text-3xl font-bold text-purple-600 mt-1">-</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow">
+                    <div class="p-4 border-b">
+                        <h2 class="text-lg font-semibold">Acceso Rápido</h2>
+                    </div>
+                    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <button onclick="showView('students')" class="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-left">
+                            <p class="font-semibold text-indigo-700">+ Nuevo Estudiante</p>
+                            <p class="text-sm text-indigo-500 mt-1">Registrar estudiante</p>
+                        </button>
+                        <button onclick="showView('payments')" class="p-4 bg-green-50 rounded-lg hover:bg-green-100 text-left">
+                            <p class="font-semibold text-green-700">+ Registrar Pago</p>
+                            <p class="text-sm text-green-500 mt-1">Rápido y sencillo</p>
+                        </button>
+                        <button onclick="showView('courses')" class="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 text-left">
+                            <p class="font-semibold text-blue-700">Ver Cursos</p>
+                            <p class="text-sm text-blue-500 mt-1">Gestionar ciclos</p>
+                        </button>
+                        <button onclick="loadAttendanceView()" class="p-4 bg-orange-50 rounded-lg hover:bg-orange-100 text-left">
+                            <p class="font-semibold text-orange-700">Asistencia</p>
+                            <p class="text-sm text-orange-500 mt-1">Pasar lista</p>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STUDENTS VIEW -->
+            <div id="students-view" class="view-section hidden space-y-6">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-semibold">Estudiantes</h2>
+                    <button onclick="showStudentForm()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                        + Nuevo Estudiante
+                    </button>
+                </div>
+
+                <!-- Student Form -->
+                <div id="student-form-container" class="bg-white rounded-xl shadow p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Nuevo Estudiante</h3>
+                    <form id="student-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                            <input type="text" name="full_name" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Cédula de Identidad *</label>
+                            <input type="text" name="id_number" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono (WhatsApp) *</label>
+                            <input type="tel" name="phone" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono Alternativo</label>
+                            <input type="tel" name="phone_secondary" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" name="email" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Nacimiento</label>
+                            <input type="date" name="birth_date" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                            <textarea name="address" rows="2" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contacto Emergencia</label>
+                            <input type="text" name="emergency_name" placeholder="Nombre" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 mb-2">
+                            <input type="tel" name="emergency_phone" placeholder="Teléfono" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Método de Pago Preferido</label>
+                            <select name="preferred_payment_method" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                                <option value="">Seleccionar...</option>
+                                <option value="cash_usd">Efectivo USD</option>
+                                <option value="cash_bs">Efectivo BS</option>
+                                <option value="pago_movil">Pago Móvil</option>
+                                <option value="binance">Binance</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nivel de Inglés</label>
+                            <select name="english_level" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                                <option value="">Seleccionar...</option>
+                                <option value="beginner">Principiante</option>
+                                <option value="elementary">Básico</option>
+                                <option value="pre_intermediate">Pre-Intermedio</option>
+                                <option value="intermediate">Intermedio</option>
+                                <option value="upper_intermediate">Intermedio-Alto</option>
+                                <option value="advanced">Avanzado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">¿Cómo se enteró?</label>
+                            <input type="text" name="referral_source" placeholder="Redes sociales, referido, etc." class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                            <textarea name="notes" rows="2" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+                        <div class="md:col-span-2 flex gap-4">
+                            <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">
+                                Guardar Estudiante
+                            </button>
+                            <button type="button" onclick="hideStudentForm()" class="text-gray-600 px-6 py-2 hover:text-gray-800">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Students List -->
+                <div class="bg-white rounded-xl shadow overflow-hidden">
+                    <div class="p-4 border-b">
+                        <input type="text" id="student-search" placeholder="Buscar estudiante..." 
+                            class="w-full max-w-md px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teléfono</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="students-list" class="divide-y divide-gray-200">
+                                <!-- Students loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COURSES VIEW -->
+            <div id="courses-view" class="view-section hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold">Cursos y Ciclos</h2>
+                    <button onclick="showCycleForm()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                        + Nuevo Ciclo
+                    </button>
+                </div>
+                <div id="cycles-container" class="space-y-4">
+                    <!-- Cycles loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- PAYMENTS VIEW -->
+            <div id="payments-view" class="view-section hidden space-y-6">
+                <h2 class="text-xl font-semibold">Registrar Pago</h2>
+                
+                <div class="bg-white rounded-xl shadow p-6 max-w-2xl">
+                    <form id="payment-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar Estudiante</label>
+                            <input type="text" id="payment-student-search" placeholder="Escribe nombre o código..." 
+                                class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                            <div id="payment-student-results" class="mt-2 hidden bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                            <input type="hidden" id="payment-student-id">
+                            <input type="hidden" id="payment-enrollment-id">
+                        </div>
+
+                        <div id="payment-student-info" class="hidden bg-gray-50 p-4 rounded-lg">
+                            <!-- Student info shown here -->
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
+                                <input type="number" name="amount" step="0.01" required 
+                                    class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Moneda *</label>
+                                <select name="currency" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                                    <option value="USD">USD</option>
+                                    <option value="BS">BS</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Método de Pago *</label>
+                            <select name="method" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                                <option value="">Seleccionar...</option>
+                                <option value="cash_usd">Efectivo USD</option>
+                                <option value="cash_bs">Efectivo BS</option>
+                                <option value="pago_movil">Pago Móvil</option>
+                                <option value="binance">Binance</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Referencia / Número de Recibo</label>
+                            <input type="text" name="reference" placeholder="Últimos 4 dígitos, hash, etc." 
+                                class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Semanas Cubiertas *</label>
+                            <input type="number" name="weeks_covered" min="1" value="1" required 
+                                class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                            <textarea name="notes" rows="2" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+
+                        <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700">
+                            Registrar Pago
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 transition-transform duration-300 z-50">
+        <span id="toast-message"></span>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
