@@ -38,35 +38,29 @@ function hideStudentRegister() {
     document.getElementById('login-form').classList.remove('hidden');
 }
 
-// Registro de estudiante
+// Registro de estudiante - El trigger en BD crea el perfil y estudiante automáticamente
 document.getElementById('register-student-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
     
     try {
-        // 1. Crear usuario en auth
+        // Crear usuario en auth con metadata - el trigger crea perfil y estudiante
         const { data: authData, error: authError } = await supabaseClient.auth.signUp({
             email: data.email,
-            password: data.password
+            password: data.password,
+            options: {
+                data: {
+                    full_name: data.full_name,
+                    id_number: data.id_number,
+                    phone: data.phone,
+                    location: data.location,
+                    role: 'student'
+                }
+            }
         });
         
         if (authError) throw authError;
-        
-        // 2. Crear perfil de estudiante
-        const studentData = {
-            id: authData.user.id,
-            code: generateStudentCode(data.location),
-            full_name: data.full_name,
-            id_number: data.id_number,
-            phone: data.phone,
-            email: data.email,
-            location: data.location,
-            status: 'active'
-        };
-        
-        const { error: studentError } = await supabaseClient.from('students').insert([studentData]);
-        if (studentError) throw studentError;
         
         showToast('Cuenta creada exitosamente. Ahora puedes iniciar sesión.');
         hideStudentRegister();
