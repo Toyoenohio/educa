@@ -231,15 +231,39 @@ async function showStudentView() {
     document.getElementById('login-view').classList.add('hidden');
     document.getElementById('app-view').classList.remove('hidden');
     
-    // Ocultar navegación de admin, mostrar solo perfil
+    // Ocultar todas las vistas primero
+    document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+    
+    // Mostrar solo la vista de perfil
+    const profileView = document.getElementById('profile-view');
+    if (profileView) profileView.classList.remove('hidden');
+    
+    // Ocultar navegación de admin
     document.querySelectorAll('.nav-btn').forEach(btn => {
-        if (btn.dataset.view !== 'profile') {
-            btn.classList.add('hidden');
-        }
+        btn.classList.add('hidden');
     });
     
+    // Mostrar solo el botón de perfil si existe
+    const profileBtn = document.querySelector('[data-view="profile"]');
+    if (profileBtn) {
+        profileBtn.classList.remove('hidden');
+        profileBtn.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+    }
+    
+    document.getElementById('user-name').textContent = currentUser.email;
+    
     // Cargar perfil del estudiante
-    await loadStudentProfile(currentUser.id);
+    try {
+        await loadStudentProfile(currentUser.id);
+    } catch (err) {
+        console.error('Error loading profile:', err);
+        document.getElementById('profile-content').innerHTML = `
+            <div class="text-center py-8">
+                <p class="text-red-500">Error cargando tu perfil. Intenta recargar la página.</p>
+                <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg">Recargar</button>
+            </div>
+        `;
+    }
 }
 
 // ============================================
@@ -726,14 +750,28 @@ document.getElementById('enrollment-form')?.addEventListener('submit', async (e)
 // ============================================
 async function loadStudentProfile(studentId) {
     try {
-        // Cargar datos del estudiante
+        // Cargar datos del estudiante - usar maybeSingle para evitar error si no existe
         const { data: student, error: studentError } = await supabaseClient
             .from('students')
             .select('*')
             .eq('id', studentId)
-            .single();
+            .maybeSingle();
         
-        if (studentError) throw studentError;
+        if (studentError) {
+            console.error('Student query error:', studentError);
+            throw studentError;
+        }
+        
+        if (!student) {
+            document.getElementById('profile-content').innerHTML = `
+                <div class="text-center py-8">
+                    <p class="text-gray-500">No se encontró tu perfil de estudiante.</p>
+                    <p class="text-sm text-gray-400 mt-2">Esto puede tardar unos segundos en actualizarse.</p>
+                    <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg">Intentar de nuevo</button>
+                </div>
+            `;
+            return;
+        }
         
         // Cargar inscripciones activas
         const { data: enrollments, error: enrollmentsError } = await supabaseClient
@@ -742,73 +780,96 @@ async function loadStudentProfile(studentId) {
             .eq('student_id', studentId)
             .eq('status', 'active');
         
-        if (enrollmentsError) throw enrollmentsError;
+        if (enrollmentsError) {
+            console.error('Enrollments error:', enrollmentsError);
+            throw enrollmentsError;
+        }
         
         // Cargar pagos
-        const { data: payments, error: paymentsError } = await supabaseClient
-            .from('payments')
-            .select('*')
-            .in('enrollment_id', enrollments?.map(e => e.id) || []);
-        
-        if (paymentsError) throw paymentsError;
+        let payments = [];
+        if (enrollments && enrollments.length > 0) {
+            const enrollmentIds = enrollments.map(e => e.id);
+            const { data: paymentsData, error: paymentsError } = await supabaseClient
+                .from('payments')
+                .select('*')
+                .in('enrollment_id', enrollmentIds);
+            
+            if (paymentsError) {
+                console.error('Payments error:', paymentsError);
+            } else {
+                payments = paymentsData || [];
+            }
+        }
         
         // Renderizar perfil
         const container = document.getElementById('profile-content');
         container.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Información Personal</h3>
-                    <p><span class="text-gray-500">Código:</span> ${student.code}</p>
-                    <p><span class="text-gray-500">Nombre:</span> ${student.full_name}</p>
-                    <p><span class="text-gray-500">Teléfono:</span> ${student.phone}</p>
-                    <p><span class="text-gray-500">Email:</span> ${student.email || 'No registrado'}</p>
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <h3 class="font-semibold text-gray-700 mb-3">Información Personal</h3>
+                    <div class="space-y-2 text-sm">
+                        <p><span class="text-gray-500">Código:</span> <span class="font-mono">${student.code || 'N/A'}</span></p>
+                        <p><span class="text-gray-500">Nombre:</span> ${student.full_name || 'N/A'}</p>
+                        <p><span class="text-gray-500">Teléfono:</span> ${student.phone || 'N/A'}</p>
+                        <p><span class="text-gray-500">Email:</span> ${student.email || currentUser.email}</p>
+                        <p><span class="text-gray-500">Sede:</span> ${student.location || 'N/A'}</p>
+                    </div>
                 </div>
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Cursos Activos</h3>
+                    <h3 class="font-semibold text-gray-700 mb-3">Cursos Activos</h3>
                     ${enrollments?.length > 0 ? enrollments.map(e => `
-                        <div class="bg-indigo-50 p-3 rounded-lg mb-2">
-                            <p class="font-medium">${e.courses.name}</p>
-                            <p class="text-sm text-gray-600">${e.courses.cycles.name}</p>
-                            <p class="text-sm text-gray-600">Pagado: ${e.weeks_paid} semanas</p>
+                        <div class="bg-indigo-50 p-4 rounded-xl mb-3">
+                            <p class="font-medium text-indigo-900">${e.courses?.name || 'Curso'}</p>
+                            <p class="text-sm text-indigo-600">${e.courses?.cycles?.name || ''}</p>
+                            <div class="mt-2 flex justify-between text-sm">
+                                <span class="text-gray-600">Semanas pagadas:</span>
+                                <span class="font-semibold">${e.weeks_paid || 0} / 15</span>
+                            </div>
+                            <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-indigo-600 h-2 rounded-full" style="width: ${Math.min(((e.weeks_paid || 0) / 15) * 100, 100)}%"></div>
+                            </div>
                         </div>
-                    `).join('') : '<p class="text-gray-500">No hay cursos activos</p>'}
+                    `).join('') : '<p class="text-gray-500 bg-gray-50 p-4 rounded-xl">No estás inscrito en ningún curso activo.</p>'}
                 </div>
             </div>
             
-            <div>
-                <h3 class="font-semibold text-gray-700 mb-2">Historial de Pagos</h3>
+            <div class="mt-6">
+                <h3 class="font-semibold text-gray-700 mb-3">Historial de Pagos</h3>
                 ${payments?.length > 0 ? `
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto bg-white rounded-xl border">
                         <table class="w-full">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Monto</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Método</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Referencia</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Semanas</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Semanas</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y">
                                 ${payments.map(p => `
-                                    <tr>
-                                        <td class="px-4 py-2 text-sm">${new Date(p.registered_at).toLocaleDateString()}</td>
-                                        <td class="px-4 py-2 text-sm">${formatCurrency(p.amount, p.currency)}</td>
-                                        <td class="px-4 py-2 text-sm capitalize">${p.method.replace('_', ' ')}</td>
-                                        <td class="px-4 py-2 text-sm font-mono">${p.reference || '-'}</td>
-                                        <td class="px-4 py-2 text-sm">${p.weeks_covered}</td>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-3 text-sm">${p.registered_at ? new Date(p.registered_at).toLocaleDateString() : '-'}</td>
+                                        <td class="px-4 py-3 text-sm font-medium">${formatCurrency(p.amount, p.currency)}</td>
+                                        <td class="px-4 py-3 text-sm capitalize">${p.method ? p.method.replace('_', ' ') : '-'}</td>
+                                        <td class="px-4 py-3 text-sm">${p.weeks_covered || 1}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                         </table>
                     </div>
-                ` : '<p class="text-gray-500">No hay pagos registrados</p>'}
+                ` : '<p class="text-gray-500 bg-gray-50 p-4 rounded-xl">No hay pagos registrados aún.</p>'}
             </div>
         `;
         
-        showView('profile');
     } catch (err) {
-        showToast('Error cargando perfil: ' + err.message, 'error');
+        console.error('Error loading profile:', err);
+        document.getElementById('profile-content').innerHTML = `
+            <div class="text-center py-8">
+                <p class="text-red-500">Error cargando tu perfil: ${err.message}</p>
+                <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg">Recargar página</button>
+            </div>
+        `;
     }
 }
 
