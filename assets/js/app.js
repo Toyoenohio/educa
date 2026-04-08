@@ -59,15 +59,19 @@ function generatePaymentReference(method, currency) {
 function showView(viewName) {
     // Ocultar todas las vistas
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-    document.getElementById(`${viewName}-view`).classList.remove('hidden');
+    const viewEl = document.getElementById(`${viewName}-view`);
+    if (viewEl) viewEl.classList.remove('hidden');
     
     // Actualizar navegación
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
         btn.classList.add('text-gray-500');
     });
-    document.querySelector(`[data-view="${viewName}"]`).classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
-    document.querySelector(`[data-view="${viewName}"]`).classList.remove('text-gray-500');
+    const navBtn = document.querySelector(`[data-view="${viewName}"]`);
+    if (navBtn) {
+        navBtn.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        navBtn.classList.remove('text-gray-500');
+    }
     
     // Cargar datos según vista
     if (viewName === 'dashboard') loadDashboard();
@@ -426,4 +430,284 @@ checkSession();
 // Asistencia (placeholder)
 function loadAttendanceView() {
     showToast('Módulo de asistencia en desarrollo');
+}
+
+// ============================================
+// CICLOS
+// ============================================
+function showCycleForm() {
+    document.getElementById('cycle-form-container').classList.remove('hidden');
+}
+
+function hideCycleForm() {
+    document.getElementById('cycle-form-container').classList.add('hidden');
+    document.getElementById('cycle-form').reset();
+}
+
+document.getElementById('cycle-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    data.created_by = currentUser.id;
+    
+    try {
+        const { error } = await supabaseClient.from('cycles').insert([data]);
+        if (error) throw error;
+        
+        showToast('Ciclo creado exitosamente');
+        hideCycleForm();
+        loadCourses();
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+});
+
+// ============================================
+// CURSOS
+// ============================================
+function showCourseForm() {
+    loadCyclesForSelect();
+    document.getElementById('course-form-container').classList.remove('hidden');
+}
+
+function hideCourseForm() {
+    document.getElementById('course-form-container').classList.add('hidden');
+    document.getElementById('course-form').reset();
+}
+
+async function loadCyclesForSelect() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('cycles')
+            .select('*')
+            .in('status', ['upcoming', 'active'])
+            .order('start_date', { ascending: false });
+        
+        if (error) throw error;
+        
+        const select = document.getElementById('course-cycle-select');
+        select.innerHTML = '<option value="">Seleccionar ciclo...</option>' +
+            data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    } catch (err) {
+        console.error('Error loading cycles:', err);
+    }
+}
+
+document.getElementById('course-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    data.created_by = currentUser.id;
+    data.status = 'upcoming';
+    
+    try {
+        const { error } = await supabaseClient.from('courses').insert([data]);
+        if (error) throw error;
+        
+        showToast('Curso creado exitosamente');
+        hideCourseForm();
+        loadCourses();
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+});
+
+// ============================================
+// INSCRIPCIONES
+// ============================================
+let selectedStudentForEnrollment = null;
+
+function showEnrollmentForm() {
+    loadCoursesForEnrollment();
+    document.getElementById('enrollment-form-container').classList.remove('hidden');
+}
+
+function hideEnrollmentForm() {
+    document.getElementById('enrollment-form-container').classList.add('hidden');
+    document.getElementById('enrollment-form').reset();
+    selectedStudentForEnrollment = null;
+}
+
+async function loadCoursesForEnrollment() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('courses')
+            .select('*, cycles(name)')
+            .in('status', ['upcoming', 'active'])
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        const select = document.getElementById('enrollment-course-select');
+        select.innerHTML = '<option value="">Seleccionar curso...</option>' +
+            data.map(c => `<option value="${c.id}">${c.name} - ${c.cycles.name}</option>`).join('');
+    } catch (err) {
+        console.error('Error loading courses:', err);
+    }
+}
+
+document.getElementById('enrollment-student-search')?.addEventListener('input', async (e) => {
+    const query = e.target.value;
+    if (query.length < 3) {
+        document.getElementById('enrollment-student-results').classList.add('hidden');
+        return;
+    }
+    
+    try {
+        const { data, error } = await supabaseClient
+            .from('students')
+            .select('*')
+            .or(`full_name.ilike.%${query}%,code.ilike.%${query}%`)
+            .eq('status', 'active')
+            .limit(5);
+        
+        if (error) throw error;
+        
+        const resultsDiv = document.getElementById('enrollment-student-results');
+        if (data && data.length > 0) {
+            resultsDiv.innerHTML = data.map(student => `
+                <div class="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-0" 
+                     onclick="selectStudentForEnrollment('${student.id}', '${student.full_name}', '${student.code}')">
+                    <p class="font-medium">${student.full_name}</p>
+                    <p class="text-sm text-gray-500">${student.code}</p>
+                </div>
+            `).join('');
+            resultsDiv.classList.remove('hidden');
+        } else {
+            resultsDiv.innerHTML = '<div class="p-3 text-gray-500">No se encontraron estudiantes</div>';
+            resultsDiv.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error('Error searching students:', err);
+    }
+});
+
+function selectStudentForEnrollment(id, name, code) {
+    selectedStudentForEnrollment = { id, name, code };
+    document.getElementById('enrollment-student-id').value = id;
+    document.getElementById('enrollment-student-search').value = name;
+    document.getElementById('enrollment-student-results').classList.add('hidden');
+}
+
+document.getElementById('enrollment-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    
+    if (!data.student_id) {
+        showToast('Debe seleccionar un estudiante', 'error');
+        return;
+    }
+    
+    data.enrolled_by = currentUser.id;
+    
+    try {
+        const { error } = await supabaseClient.from('enrollments').insert([data]);
+        if (error) throw error;
+        
+        showToast('Estudiante inscrito exitosamente');
+        hideEnrollmentForm();
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+});
+
+// ============================================
+// VISTA DE PERFIL PARA ESTUDIANTES
+// ============================================
+async function loadStudentProfile(studentId) {
+    try {
+        // Cargar datos del estudiante
+        const { data: student, error: studentError } = await supabaseClient
+            .from('students')
+            .select('*')
+            .eq('id', studentId)
+            .single();
+        
+        if (studentError) throw studentError;
+        
+        // Cargar inscripciones activas
+        const { data: enrollments, error: enrollmentsError } = await supabaseClient
+            .from('enrollments')
+            .select('*, courses(*, cycles(*))')
+            .eq('student_id', studentId)
+            .eq('status', 'active');
+        
+        if (enrollmentsError) throw enrollmentsError;
+        
+        // Cargar pagos
+        const { data: payments, error: paymentsError } = await supabaseClient
+            .from('payments')
+            .select('*')
+            .in('enrollment_id', enrollments?.map(e => e.id) || []);
+        
+        if (paymentsError) throw paymentsError;
+        
+        // Renderizar perfil
+        const container = document.getElementById('profile-content');
+        container.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-2">Información Personal</h3>
+                    <p><span class="text-gray-500">Código:</span> ${student.code}</p>
+                    <p><span class="text-gray-500">Nombre:</span> ${student.full_name}</p>
+                    <p><span class="text-gray-500">Teléfono:</span> ${student.phone}</p>
+                    <p><span class="text-gray-500">Email:</span> ${student.email || 'No registrado'}</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-2">Cursos Activos</h3>
+                    ${enrollments?.length > 0 ? enrollments.map(e => `
+                        <div class="bg-indigo-50 p-3 rounded-lg mb-2">
+                            <p class="font-medium">${e.courses.name}</p>
+                            <p class="text-sm text-gray-600">${e.courses.cycles.name}</p>
+                            <p class="text-sm text-gray-600">Pagado: ${e.weeks_paid} semanas</p>
+                        </div>
+                    `).join('') : '<p class="text-gray-500">No hay cursos activos</p>'}
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="font-semibold text-gray-700 mb-2">Historial de Pagos</h3>
+                ${payments?.length > 0 ? `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Monto</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Método</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Referencia</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Semanas</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                ${payments.map(p => `
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm">${new Date(p.registered_at).toLocaleDateString()}</td>
+                                        <td class="px-4 py-2 text-sm">${formatCurrency(p.amount, p.currency)}</td>
+                                        <td class="px-4 py-2 text-sm capitalize">${p.method.replace('_', ' ')}</td>
+                                        <td class="px-4 py-2 text-sm font-mono">${p.reference || '-'}</td>
+                                        <td class="px-4 py-2 text-sm">${p.weeks_covered}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : '<p class="text-gray-500">No hay pagos registrados</p>'}
+            </div>
+        `;
+        
+        showView('profile');
+    } catch (err) {
+        showToast('Error cargando perfil: ' + err.message, 'error');
+    }
+}
+
+// Función para mostrar perfil (puede ser llamada desde URL o botón)
+function showStudentProfile(studentId) {
+    if (!studentId) {
+        showToast('ID de estudiante no proporcionado', 'error');
+        return;
+    }
+    loadStudentProfile(studentId);
 }
