@@ -1,7 +1,7 @@
 // EDUCA App - MVP
-// Configuración Supabase (reemplazar con tus credenciales)
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key';
+// Configuración Supabase
+const SUPABASE_URL = 'https://mloffflzgizbyqwhdukl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sb2ZmZmx6Z2l6Ynlxd2hkdWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzExNzIsImV4cCI6MjA5MTI0NzE3Mn0.WgDVTqRAQBLLr-zp0xJGzpklKMnv8tRhRV9M3VXa49M';
 
 // Inicializar Supabase
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
