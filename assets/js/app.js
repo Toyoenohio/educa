@@ -8,9 +8,73 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 // Estado global
 let currentUser = null;
+let userRole = 'admin'; // 'admin' o 'student'
 let students = [];
 let courses = [];
 let enrollments = [];
+
+// ============================================
+// TIPO DE LOGIN
+// ============================================
+function setLoginType(type) {
+    userRole = type;
+    document.getElementById('login-type-admin').className = type === 'admin' 
+        ? 'flex-1 py-2 rounded-md text-sm font-medium bg-white shadow text-indigo-600'
+        : 'flex-1 py-2 rounded-md text-sm font-medium text-gray-500';
+    document.getElementById('login-type-student').className = type === 'student'
+        ? 'flex-1 py-2 rounded-md text-sm font-medium bg-white shadow text-indigo-600'
+        : 'flex-1 py-2 rounded-md text-sm font-medium text-gray-500';
+    
+    document.getElementById('student-register-link').classList.toggle('hidden', type === 'admin');
+}
+
+function showStudentRegister() {
+    document.getElementById('student-register-form').classList.remove('hidden');
+    document.getElementById('login-form').classList.add('hidden');
+}
+
+function hideStudentRegister() {
+    document.getElementById('student-register-form').classList.add('hidden');
+    document.getElementById('login-form').classList.remove('hidden');
+}
+
+// Registro de estudiante
+document.getElementById('register-student-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    
+    try {
+        // 1. Crear usuario en auth
+        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+            email: data.email,
+            password: data.password
+        });
+        
+        if (authError) throw authError;
+        
+        // 2. Crear perfil de estudiante
+        const studentData = {
+            id: authData.user.id,
+            code: generateStudentCode(data.location),
+            full_name: data.full_name,
+            id_number: data.id_number,
+            phone: data.phone,
+            email: data.email,
+            location: data.location,
+            status: 'active'
+        };
+        
+        const { error: studentError } = await supabaseClient.from('students').insert([studentData]);
+        if (studentError) throw studentError;
+        
+        showToast('Cuenta creada exitosamente. Ahora puedes iniciar sesión.');
+        hideStudentRegister();
+        document.getElementById('login-email').value = data.email;
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+});
 
 // ============================================
 // UTILIDADES
@@ -99,12 +163,24 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         if (error) throw error;
         
         currentUser = data.user;
-        document.getElementById('login-view').classList.add('hidden');
-        document.getElementById('app-view').classList.remove('hidden');
-        document.getElementById('user-name').textContent = currentUser.email;
+        
+        // Verificar si es admin o estudiante
+        const { data: adminData } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+        
+        if (adminData) {
+            userRole = 'admin';
+            showAdminView();
+        } else {
+            // Es estudiante
+            userRole = 'student';
+            showStudentView();
+        }
         
         showToast('¡Bienvenido a EDUCA!');
-        loadDashboard();
     } catch (err) {
         errorEl.textContent = err.message;
         errorEl.classList.remove('hidden');
@@ -126,11 +202,50 @@ async function checkSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
         currentUser = session.user;
-        document.getElementById('login-view').classList.add('hidden');
-        document.getElementById('app-view').classList.remove('hidden');
-        document.getElementById('user-name').textContent = currentUser.email;
-        loadDashboard();
+        
+        // Verificar si es admin o estudiante
+        const { data: adminData } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+        
+        if (adminData) {
+            userRole = 'admin';
+            showAdminView();
+        } else {
+            userRole = 'student';
+            showStudentView();
+        }
     }
+}
+
+// Mostrar vista de admin
+function showAdminView() {
+    document.getElementById('login-view').classList.add('hidden');
+    document.getElementById('app-view').classList.remove('hidden');
+    document.getElementById('user-name').textContent = currentUser.email;
+    
+    // Mostrar navegación completa
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('hidden'));
+    
+    loadDashboard();
+}
+
+// Mostrar vista de estudiante
+async function showStudentView() {
+    document.getElementById('login-view').classList.add('hidden');
+    document.getElementById('app-view').classList.remove('hidden');
+    
+    // Ocultar navegación de admin, mostrar solo perfil
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.view !== 'profile') {
+            btn.classList.add('hidden');
+        }
+    });
+    
+    // Cargar perfil del estudiante
+    await loadStudentProfile(currentUser.id);
 }
 
 // ============================================

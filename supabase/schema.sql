@@ -22,8 +22,8 @@ CREATE TABLE profiles (
 -- 2. STUDENTS (Estudiantes)
 -- ============================================
 CREATE TABLE students (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    code TEXT UNIQUE NOT NULL, -- EF-USD-08042026-03113
+    id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL, -- US-ANZ-00001
     full_name TEXT NOT NULL,
     id_number TEXT NOT NULL, -- Cédula
     phone TEXT NOT NULL, -- WhatsApp
@@ -208,9 +208,15 @@ CREATE POLICY "Profiles readable by all authenticated" ON profiles
 CREATE POLICY "Users can update own profile" ON profiles
     FOR UPDATE USING (auth.uid() = id);
 
--- Students: Full access to authenticated users
-CREATE POLICY "Students full access to authenticated" ON students
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Students: Students can read own data, admins can read all
+CREATE POLICY "Students read own or admin all" ON students
+    FOR SELECT USING (auth.uid() = id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Students insert own" ON students
+    FOR INSERT WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Students update own or admin" ON students
+    FOR UPDATE USING (auth.uid() = id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
 
 -- Cycles: Full access to authenticated users
 CREATE POLICY "Cycles full access to authenticated" ON cycles
@@ -220,21 +226,39 @@ CREATE POLICY "Cycles full access to authenticated" ON cycles
 CREATE POLICY "Courses full access to authenticated" ON courses
     FOR ALL USING (auth.role() = 'authenticated');
 
--- Enrollments: Full access to authenticated users
-CREATE POLICY "Enrollments full access to authenticated" ON enrollments
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Enrollments: Students can read own, admins can manage all
+CREATE POLICY "Enrollments read own or admin all" ON enrollments
+    FOR SELECT USING (student_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Enrollments insert by admin" ON enrollments
+    FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Enrollments update by admin" ON enrollments
+    FOR UPDATE USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
 
 -- Classes: Full access to authenticated users
 CREATE POLICY "Classes full access to authenticated" ON classes
     FOR ALL USING (auth.role() = 'authenticated');
 
--- Attendances: Full access to authenticated users
-CREATE POLICY "Attendances full access to authenticated" ON attendances
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Attendances: Students can read own, admins can manage
+CREATE POLICY "Attendances read own or admin all" ON attendances
+    FOR SELECT USING (
+        EXISTS (SELECT 1 FROM enrollments WHERE id = enrollment_id AND student_id = auth.uid())
+        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid())
+    );
 
--- Payments: Full access to authenticated users
-CREATE POLICY "Payments full access to authenticated" ON payments
-    FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Attendances manage by admin" ON attendances
+    FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
+
+-- Payments: Students can read own, admins can manage
+CREATE POLICY "Payments read own or admin all" ON payments
+    FOR SELECT USING (
+        EXISTS (SELECT 1 FROM enrollments WHERE id = enrollment_id AND student_id = auth.uid())
+        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Payments manage by admin" ON payments
+    FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
 
 -- Exchange rates: Full access to authenticated users
 CREATE POLICY "Exchange rates full access to authenticated" ON exchange_rates
@@ -245,33 +269,17 @@ CREATE POLICY "Exchange rates full access to authenticated" ON exchange_rates
 -- ============================================
 
 -- Function to generate student code
-CREATE OR REPLACE FUNCTION generate_student_code(payment_method TEXT, currency TEXT)
+CREATE OR REPLACE FUNCTION generate_student_code(location TEXT)
 RETURNS TEXT AS $$
 DECLARE
     prefix TEXT;
-    currency_code TEXT;
-    date_str TEXT;
-    sequence_num TEXT;
+    loc TEXT;
+    random_num TEXT;
 BEGIN
-    -- Set prefix based on course type (default to EF for now)
-    prefix := 'EF';
-    
-    -- Set currency code
-    currency_code := UPPER(currency);
-    
-    -- Date string DDMMYYYY
-    date_str := TO_CHAR(CURRENT_DATE, 'DDMMYYYY');
-    
-    -- Get next sequence number for today
-    SELECT LPAD(COUNT(*)::TEXT, 5, '0')
-    INTO sequence_num
-    FROM students
-    WHERE DATE(created_at) = CURRENT_DATE;
-    
-    -- Increment to get next number
-    sequence_num := LPAD((sequence_num::INT + 1)::TEXT, 5, '0');
-    
-    RETURN prefix || '-' || currency_code || '-' || date_str || '-' || sequence_num;
+    prefix := 'US';
+    loc := COALESCE(location, 'ANZ');
+    random_num := LPAD(FLOOR(10000 + RANDOM() * 90000)::TEXT, 5, '0');
+    RETURN prefix || '-' || loc || '-' || random_num;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -298,7 +306,6 @@ CREATE TRIGGER update_enrollments_updated_at BEFORE UPDATE ON enrollments
 CREATE OR REPLACE FUNCTION update_enrollment_stats()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Update attendance/absence counts
     UPDATE enrollments
     SET 
         attendance_count = (SELECT COUNT(*) FROM attendances WHERE enrollment_id = NEW.enrollment_id AND status = 'present'),
