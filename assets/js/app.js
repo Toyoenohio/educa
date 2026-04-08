@@ -190,23 +190,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         
         currentUser = data.user;
         
-        // Verificar si es admin o estudiante
-        const { data: adminData } = await supabaseClient
-            .from('profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
+        // Verificar/crear perfil automáticamente
+        await ensureUserProfile();
         
-        if (adminData) {
-            userRole = 'admin';
-            showAdminView();
-        } else {
-            // Es estudiante
-            userRole = 'student';
-            showStudentView();
-        }
-        
-        showToast('¡Bienvenido a EDUCA!');
     } catch (err) {
         errorEl.textContent = err.message;
         errorEl.classList.remove('hidden');
@@ -215,6 +201,78 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         btn.textContent = 'Ingresar';
     }
 });
+
+// Función para asegurar que el perfil existe
+async function ensureUserProfile() {
+    try {
+        // Verificar si existe en profiles
+        const { data: profile } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+        
+        // Si no existe en profiles, crearlo
+        if (!profile) {
+            await supabaseClient.from('profiles').insert([{
+                id: currentUser.id,
+                email: currentUser.email,
+                full_name: currentUser.user_metadata?.full_name || currentUser.email,
+                role: 'student'
+            }]);
+        } else {
+            userRole = profile.role;
+        }
+        
+        // Si es estudiante, verificar/crear en students
+        if (userRole === 'student') {
+            const { data: student } = await supabaseClient
+                .from('students')
+                .select('*')
+                .eq('id', currentUser.id)
+                .maybeSingle();
+            
+            if (!student) {
+                // Buscar si hay un estudiante con este email
+                const { data: existingByEmail } = await supabaseClient
+                    .from('students')
+                    .select('*')
+                    .eq('email', currentUser.email)
+                    .maybeSingle();
+                
+                if (existingByEmail) {
+                    // Actualizar el ID
+                    await supabaseClient.from('students')
+                        .update({ id: currentUser.id })
+                        .eq('email', currentUser.email);
+                } else {
+                    // Crear nuevo estudiante
+                    const location = currentUser.user_metadata?.location || 'ANZ';
+                    await supabaseClient.from('students').insert([{
+                        id: currentUser.id,
+                        code: generateStudentCode(location),
+                        full_name: currentUser.user_metadata?.full_name || currentUser.email,
+                        email: currentUser.email,
+                        phone: currentUser.user_metadata?.phone || 'PENDING',
+                        id_number: currentUser.user_metadata?.id_number || 'PENDING',
+                        location: location,
+                        status: 'active'
+                    }]);
+                }
+            }
+            
+            showStudentView();
+        } else {
+            showAdminView();
+        }
+        
+        showToast('¡Bienvenido a EDUCA!');
+        
+    } catch (err) {
+        console.error('Error ensuring profile:', err);
+        showToast('Error cargando perfil', 'error');
+    }
+}
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
     await supabaseClient.auth.signOut();
@@ -228,21 +286,7 @@ async function checkSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
         currentUser = session.user;
-        
-        // Verificar si es admin o estudiante
-        const { data: adminData } = await supabaseClient
-            .from('profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
-        
-        if (adminData) {
-            userRole = 'admin';
-            showAdminView();
-        } else {
-            userRole = 'student';
-            showStudentView();
-        }
+        await ensureUserProfile();
     }
 }
 
