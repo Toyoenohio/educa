@@ -62,11 +62,43 @@ document.getElementById('register-student-form')?.addEventListener('submit', asy
         
         if (authError) throw authError;
         
+        // Esperar un momento para que el trigger se ejecute
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verificar si el estudiante fue creado
+        const { data: studentCheck, error: checkError } = await supabaseClient
+            .from('students')
+            .select('*')
+            .eq('id', authData.user.id)
+            .maybeSingle();
+        
+        // Si no existe, crearlo manualmente
+        if (!studentCheck && !checkError) {
+            const studentCode = generateStudentCode(data.location);
+            const { error: insertError } = await supabaseClient.from('students').insert([{
+                id: authData.user.id,
+                code: studentCode,
+                full_name: data.full_name,
+                id_number: data.id_number,
+                phone: data.phone,
+                email: data.email,
+                location: data.location,
+                status: 'active'
+            }]);
+            
+            if (insertError) {
+                console.error('Error creating student manually:', insertError);
+            } else {
+                console.log('Student created manually with code:', studentCode);
+            }
+        }
+        
         showToast('Cuenta creada exitosamente. Ahora puedes iniciar sesión.');
         hideStudentRegister();
         document.getElementById('login-email').value = data.email;
     } catch (err) {
         showToast('Error: ' + err.message, 'error');
+        console.error('Registration error:', err);
     }
 });
 
