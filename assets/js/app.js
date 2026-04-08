@@ -357,62 +357,18 @@ document.getElementById('student-form').addEventListener('submit', async (e) => 
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
     
+    // Generar código único basado en sede
+    data.code = generateStudentCode(data.location);
+    
     try {
-        // 1. Crear usuario en Auth (como admin)
-        const tempPassword = Math.random().toString(36).slice(-8); // Contraseña temporal
+        const { error } = await supabaseClient.from('students').insert([data]);
+        if (error) throw error;
         
-        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-            email: data.email,
-            password: tempPassword,
-            options: {
-                data: {
-                    full_name: data.full_name,
-                    id_number: data.id_number,
-                    phone: data.phone,
-                    location: data.location,
-                    role: 'student'
-                }
-            }
-        });
-        
-        if (authError) throw authError;
-        
-        // 2. Esperar a que el trigger cree el estudiante, o crearlo manualmente
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const { data: studentCheck } = await supabaseClient
-            .from('students')
-            .select('*')
-            .eq('id', authData.user.id)
-            .maybeSingle();
-            
-        if (!studentCheck) {
-            // Crear manualmente si el trigger falló
-            const studentCode = generateStudentCode(data.location);
-            await supabaseClient.from('students').insert([{
-                id: authData.user.id,
-                code: studentCode,
-                full_name: data.full_name,
-                id_number: data.id_number,
-                phone: data.phone,
-                email: data.email,
-                location: data.location,
-                status: 'active'
-            }]);
-        }
-        
-        showToast(`Estudiante registrado. Contraseña temporal: ${tempPassword}. Guárdala y compártela con el estudiante.`);
-        
-        // Mostrar contraseña en un alert para que el admin la copie
-        setTimeout(() => {
-            alert(`ESTUDIANTE CREADO\n\nEmail: ${data.email}\nContraseña temporal: ${tempPassword}\n\nComparte esta información con el estudiante. Deberá cambiar la contraseña al iniciar sesión.`);
-        }, 500);
-        
+        showToast('Estudiante registrado. Ahora el estudiante debe registrarse en "Iniciar sesión > Estudiante > Registrarse" usando el mismo email.');
         hideStudentForm();
         loadStudents();
     } catch (err) {
         showToast('Error: ' + err.message, 'error');
-        console.error('Error creating student:', err);
     }
 });
 
