@@ -34,9 +34,20 @@ function formatCurrency(amount, currency = 'USD') {
         : `Bs. ${parseFloat(amount).toFixed(2)}`;
 }
 
-function generateStudentCode(paymentMethod, currency) {
+function generateStudentCode(location) {
+    const prefix = 'US';
+    const loc = location || 'ANZ'; // Default location
+    const random = Math.floor(10000 + Math.random() * 90000);
+    return `${prefix}-${loc}-${random}`;
+}
+
+// Generar referencia de pago para efectivo
+function generatePaymentReference(method, currency) {
+    if (method !== 'cash_usd' && method !== 'cash_bs') {
+        return ''; // Solo para efectivo
+    }
     const prefix = 'EF';
-    const curr = currency || 'USD';
+    const curr = currency === 'BS' ? 'BS' : 'USD';
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const random = Math.floor(10000 + Math.random() * 90000);
     return `${prefix}-${curr}-${date}-${random}`;
@@ -177,8 +188,8 @@ document.getElementById('student-form').addEventListener('submit', async (e) => 
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
     
-    // Generar código único
-    data.code = generateStudentCode(data.preferred_payment_method, 'USD');
+    // Generar código único basado en sede
+    data.code = generateStudentCode(data.location);
     
     try {
         const { error } = await supabaseClient.from('students').insert([data]);
@@ -305,25 +316,28 @@ document.getElementById('payment-student-search').addEventListener('input', asyn
     }
     
     try {
+        // Buscar solo estudiantes activos, sin requerir inscripción
         const { data, error } = await supabaseClient
             .from('students')
-            .select('*, enrollments!inner(*, courses(*))')
-            .ilike('full_name', `%${query}%`)
-            .or(`code.ilike.%${query}%`)
-            .eq('enrollments.status', 'active')
+            .select('*, enrollments(*, courses(*))')
+            .or(`full_name.ilike.%${query}%,code.ilike.%${query}%`)
+            .eq('status', 'active')
             .limit(5);
         
         if (error) throw error;
         
         const resultsDiv = document.getElementById('payment-student-results');
         if (data && data.length > 0) {
-            resultsDiv.innerHTML = data.map(student => `
+            resultsDiv.innerHTML = data.map(student => {
+                const enrollment = student.enrollments?.[0];
+                const courseName = enrollment?.courses?.name || 'Sin curso activo';
+                return `
                 <div class="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-0" 
-                     onclick="selectStudentForPayment('${student.id}', '${student.full_name}', '${student.code}', '${student.enrollments[0]?.id}')">
+                     onclick="selectStudentForPayment('${student.id}', '${student.full_name}', '${student.code}', '${enrollment?.id || ''}')">
                     <p class="font-medium">${student.full_name}</p>
-                    <p class="text-sm text-gray-500">${student.code} - ${student.enrollments[0]?.courses?.name || 'Sin curso'}</p>
+                    <p class="text-sm text-gray-500">${student.code} - ${courseName}</p>
                 </div>
-            `).join('');
+            `}).join('');
             resultsDiv.classList.remove('hidden');
         } else {
             resultsDiv.innerHTML = '<div class="p-3 text-gray-500">No se encontraron estudiantes</div>';
@@ -348,17 +362,43 @@ function selectStudentForPayment(id, name, code, enrollmentId) {
     document.getElementById('payment-student-info').classList.remove('hidden');
 }
 
+document.getElementById('payment-method').addEventListener('change', (e) => {
+    const method = e.target.value;
+    const currency = document.querySelector('[name="currency"]').value || 'USD';
+    const referenceInput = document.getElementById('payment-reference');
+    const hint = document.getElementById('reference-hint');
+    
+    if (method === 'cash_usd' || method === 'cash_bs') {
+        referenceInput.value = generatePaymentReference(method, currency);
+        referenceInput.readOnly = true;
+        hint.classList.remove('hidden');
+    } else {
+        referenceInput.value = '';
+        referenceInput.readOnly = false;
+        hint.classList.add('hidden');
+    }
+});
+
+// Actualizar referencia cuando cambia moneda (solo para efectivo)
+document.querySelector('[name="currency"]').addEventListener('change', (e) => {
+    const method = document.getElementById('payment-method').value;
+    if (method === 'cash_usd' || method === 'cash_bs') {
+        document.getElementById('payment-reference').value = generatePaymentReference(method, e.target.value);
+    }
+});
+
 document.getElementById('payment-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
     
-    if (!selectedStudent || !selectedStudent.enrollmentId) {
-        showToast('Debe seleccionar un estudiante con inscripción activa', 'error');
+    if (!selectedStudent) {
+        showToast('Debe seleccionar un estudiante', 'error');
         return;
     }
     
-    data.enrollment_id = selectedStudent.enrollmentId;
+    // Si no hay inscripción, permitir igual (para testing)
+    data.enrollment_id = selectedStudent.enrollmentId || null;
     data.registered_by = currentUser.id;
     
     try {

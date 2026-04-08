@@ -31,6 +31,7 @@ CREATE TABLE students (
     email TEXT,
     birth_date DATE,
     address TEXT,
+    location TEXT DEFAULT 'ANZ', -- Sede: ANZ, SUC, CCS
     emergency_name TEXT,
     emergency_phone TEXT,
     preferred_payment_method TEXT CHECK (preferred_payment_method IN ('cash_usd', 'cash_bs', 'pago_movil', 'binance')),

@@ -151,6 +151,15 @@
                             <input type="tel" name="phone" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
                         </div>
                         <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Sede/Location *</label>
+                            <select name="location" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                                <option value="">Seleccionar...</option>
+                                <option value="ANZ">ANZ - Anzoátegui</option>
+                                <option value="SUC">SUC - Sucre</option>
+                                <option value="CCS">CCS - Caracas</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono Alternativo</label>
                             <input type="tel" name="phone_secondary" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
                         </div>
@@ -286,7 +295,7 @@
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Método de Pago *</label>
-                            <select name="method" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                            <select name="method" id="payment-method" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
                                 <option value="">Seleccionar...</option>
                                 <option value="cash_usd">Efectivo USD</option>
                                 <option value="cash_bs">Efectivo BS</option>
@@ -297,8 +306,9 @@
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Referencia / Número de Recibo</label>
-                            <input type="text" name="reference" placeholder="Últimos 4 dígitos, hash, etc." 
+                            <input type="text" name="reference" id="payment-reference" placeholder="Últimos 4 dígitos, hash, etc." 
                                 class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500">
+                            <p id="reference-hint" class="text-xs text-gray-500 mt-1 hidden">Se generará automáticamente para pagos en efectivo</p>
                         </div>
 
                         <div>
