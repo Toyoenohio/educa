@@ -919,6 +919,7 @@ async function loadStudentProfile(studentId) {
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Referencia</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Semanas</th>
                                 </tr>
                             </thead>
@@ -928,6 +929,7 @@ async function loadStudentProfile(studentId) {
                                         <td class="px-4 py-3 text-sm">${p.registered_at ? new Date(p.registered_at).toLocaleDateString() : '-'}</td>
                                         <td class="px-4 py-3 text-sm font-medium">${formatCurrency(p.amount, p.currency)}</td>
                                         <td class="px-4 py-3 text-sm capitalize">${p.method ? p.method.replace('_', ' ') : '-'}</td>
+                                        <td class="px-4 py-3 text-sm font-mono text-xs">${p.reference || '-'}</td>
                                         <td class="px-4 py-3 text-sm">${p.weeks_covered || 1}</td>
                                     </tr>
                                 `).join('')}
