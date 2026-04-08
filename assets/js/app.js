@@ -4,7 +4,7 @@ const SUPABASE_URL = 'https://mloffflzgizbyqwhdukl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sb2ZmZmx6Z2l6Ynlxd2hkdWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzExNzIsImV4cCI6MjA5MTI0NzE3Mn0.WgDVTqRAQBLLr-zp0xJGzpklKMnv8tRhRV9M3VXa49M';
 
 // Inicializar Supabase
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Estado global
 let currentUser = null;
@@ -79,7 +79,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     errorEl.classList.add('hidden');
     
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         
         if (error) throw error;
         
@@ -100,7 +100,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     currentUser = null;
     document.getElementById('app-view').classList.add('hidden');
     document.getElementById('login-view').classList.remove('hidden');
@@ -108,7 +108,7 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 
 // Verificar sesión al cargar
 async function checkSession() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
         currentUser = session.user;
         document.getElementById('login-view').classList.add('hidden');
@@ -124,14 +124,14 @@ async function checkSession() {
 async function loadDashboard() {
     try {
         // Estudiantes activos
-        const { count: activeStudents } = await supabase
+        const { count: activeStudents } = await supabaseClient
             .from('students')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'active');
         document.getElementById('stat-active-students').textContent = activeStudents || 0;
         
         // Cursos activos
-        const { count: activeCourses } = await supabase
+        const { count: activeCourses } = await supabaseClient
             .from('courses')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'active');
@@ -139,7 +139,7 @@ async function loadDashboard() {
         
         // Pagos de hoy
         const today = new Date().toISOString().split('T')[0];
-        const { count: todayPayments, data: todayData } = await supabase
+        const { count: todayPayments, data: todayData } = await supabaseClient
             .from('payments')
             .select('*', { count: 'exact' })
             .gte('registered_at', today);
@@ -148,7 +148,7 @@ async function loadDashboard() {
         // Recaudado este mes
         const monthStart = new Date();
         monthStart.setDate(1);
-        const { data: monthPayments } = await supabase
+        const { data: monthPayments } = await supabaseClient
             .from('payments')
             .select('amount')
             .gte('registered_at', monthStart.toISOString());
@@ -181,7 +181,7 @@ document.getElementById('student-form').addEventListener('submit', async (e) => 
     data.code = generateStudentCode(data.preferred_payment_method, 'USD');
     
     try {
-        const { error } = await supabase.from('students').insert([data]);
+        const { error } = await supabaseClient.from('students').insert([data]);
         if (error) throw error;
         
         showToast('Estudiante registrado exitosamente');
@@ -194,7 +194,7 @@ document.getElementById('student-form').addEventListener('submit', async (e) => 
 
 async function loadStudents() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('students')
             .select('*')
             .order('created_at', { ascending: false });
@@ -248,7 +248,7 @@ function viewStudent(id) {
 // ============================================
 async function loadCourses() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('cycles')
             .select(`
                 *,
@@ -305,7 +305,7 @@ document.getElementById('payment-student-search').addEventListener('input', asyn
     }
     
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('students')
             .select('*, enrollments!inner(*, courses(*))')
             .ilike('full_name', `%${query}%`)
@@ -362,7 +362,7 @@ document.getElementById('payment-form').addEventListener('submit', async (e) => 
     data.registered_by = currentUser.id;
     
     try {
-        const { error } = await supabase.from('payments').insert([data]);
+        const { error } = await supabaseClient.from('payments').insert([data]);
         if (error) throw error;
         
         showToast('Pago registrado exitosamente');
