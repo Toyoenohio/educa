@@ -339,3 +339,39 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER after_payment_insert AFTER INSERT ON payments
     FOR EACH ROW EXECUTE FUNCTION update_enrollment_after_payment();
+
+-- ============================================
+-- 10. SETTINGS (Configuración de pagos y empresa)
+-- ============================================
+CREATE TABLE settings (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    key TEXT UNIQUE NOT NULL,
+    value TEXT NOT NULL,
+    description TEXT,
+    category TEXT DEFAULT 'general',
+    updated_by UUID REFERENCES profiles(id),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- RLS for settings
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Settings readable by all authenticated" ON settings
+    FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Settings manageable by admin" ON settings
+    FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid()));
+
+-- Insert default payment settings
+INSERT INTO settings (key, value, description, category) VALUES
+('pago_movil_banco', 'Banco de Venezuela', 'Nombre del banco para Pago Móvil', 'payment'),
+('pago_movil_telefono', '0414-1234567', 'Número de teléfono para Pago Móvil', 'payment'),
+('pago_movil_rif', 'J-12345678-9', 'RIF de la empresa para Pago Móvil', 'payment'),
+('binance_id', 'EducaFoundation2024', 'ID de usuario en Binance', 'payment'),
+('binance_network', 'TRC-20 (TRON)', 'Red recomendada para transferencias Binance', 'payment'),
+('efectivo_direccion', 'Calle Principal #123, Caracas', 'Dirección para pagos en efectivo', 'payment'),
+('efectivo_horario', 'Lunes a Viernes 8:00 AM - 5:00 PM', 'Horario de atención para pagos en efectivo', 'payment'),
+('company_name', 'EDUCA - Fundación Educativa', 'Nombre de la organización', 'general'),
+('support_phone', '0414-1234567', 'Teléfono de soporte/whatsapp', 'general'),
+('support_email', 'pagos@educa.org', 'Email de soporte', 'general')
+ON CONFLICT (key) DO NOTHING;
