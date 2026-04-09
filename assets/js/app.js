@@ -938,7 +938,100 @@ async function loadStudentProfile(studentId) {
                     </div>
                 ` : '<p class="text-gray-500 bg-gray-50 p-4 rounded-xl">No hay pagos registrados aún.</p>'}
             </div>
+            
+            <!-- Reportar Pago -->
+            <div class="mt-6 bg-green-50 p-6 rounded-xl border border-green-200">
+                <h3 class="font-semibold text-green-800 mb-2">📢 Reportar Pago</h3>
+                <p class="text-sm text-green-600 mb-4">Reporta tu pago para que el administrador lo verifique y registre.</p>
+                
+                <form id="student-report-payment-form" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Monto Pagado *</label>
+                            <input type="number" name="amount" step="0.01" required 
+                                class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Moneda *</label>
+                            <select name="currency" required class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500">
+                                <option value="USD">USD</option>
+                                <option value="BS">Bolívares (BS)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Método de Pago *</label>
+                        <select name="method" id="student-payment-method" required 
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500">
+                            <option value="">Seleccionar...</option>
+                            <option value="pago_movil">Pago Móvil</option>
+                            <option value="binance">Binance</option>
+                            <option value="cash_usd">Efectivo USD</option>
+                            <option value="cash_bs">Efectivo BS</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Número de Referencia / Comprobante *</label>
+                        <input type="text" name="reference" required 
+                            placeholder="Últimos 4 dígitos, número de transferencia, etc."
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500">
+                        <p class="text-xs text-gray-500 mt-1">Este número será usado para verificar tu pago</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">¿Es pago adelantado?</label>
+                        <div class="flex gap-4 mt-1">
+                            <label class="flex items-center">
+                                <input type="radio" name="is_advance" value="no" checked class="mr-2">
+                                <span class="text-sm">No, pago de esta semana</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="is_advance" value="yes" class="mr-2">
+                                <span class="text-sm">Sí, adelanto de semanas</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="advance-weeks-container" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">¿Cuántas semanas adelantas?</label>
+                        <select name="weeks_advance" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500">
+                            <option value="1">1 semana</option>
+                            <option value="2">2 semanas</option>
+                            <option value="3">3 semanas</option>
+                            <option value="4">4 semanas</option>
+                        </select>
+                    </div>
+                    
+                    <div class="bg-white p-4 rounded-lg border border-green-200">
+                        <h4 class="font-medium text-green-800 mb-2">📋 Datos para tu Pago</h4>
+                        <div class="text-sm text-gray-600 space-y-1">
+                            <p><span class="font-medium">Costo semanal:</span> $10 USD</p>
+                            <p><span class="font-medium">Tu código:</span> <span class="font-mono bg-gray-100 px-2 py-1 rounded">${student.code || 'N/A'}</span></p>
+                            <p class="text-xs text-gray-500 mt-2">Incluye tu código como referencia al hacer el pago</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Notas adicionales</label>
+                        <textarea name="notes" rows="2" placeholder="Opcional: fecha del pago, banco emisor, etc."
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+                        📨 Enviar Reporte de Pago
+                    </button>
+                    
+                    <p class="text-xs text-gray-500 text-center">
+                        El administrador revisará y confirmará tu pago. Recibirás una notificación por WhatsApp.
+                    </p>
+                </form>
+            </div>
         `;
+        
+        // Setup payment report form listeners after rendering
+        setupPaymentReportForm(studentId, enrollments);
         
     } catch (err) {
         console.error('Error loading profile:', err);
@@ -958,4 +1051,59 @@ function showStudentProfile(studentId) {
         return;
     }
     loadStudentProfile(studentId);
+}
+
+// Setup payment report form event listeners
+function setupPaymentReportForm(studentId, enrollments) {
+    // Toggle advance weeks select
+    const advanceRadios = document.querySelectorAll('input[name="is_advance"]');
+    advanceRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const container = document.getElementById('advance-weeks-container');
+            if (e.target.value === 'yes') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+        });
+    });
+    
+    // Handle form submission
+    const form = document.getElementById('student-report-payment-form');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            // Calculate weeks covered
+            const weeksCovered = data.is_advance === 'yes' ? parseInt(data.weeks_advance || 1) : 1;
+            
+            try {
+                // Create a payment report (pending status)
+                const { error } = await supabaseClient.from('payments').insert([{
+                    enrollment_id: enrollments[0]?.id,
+                    amount: parseFloat(data.amount),
+                    currency: data.currency,
+                    method: data.method,
+                    reference: data.reference,
+                    weeks_covered: weeksCovered,
+                    status: 'pending',
+                    notes: data.notes || 'Reportado por estudiante',
+                    registered_by: currentUser.id
+                }]);
+                
+                if (error) throw error;
+                
+                showToast('✅ Pago reportado exitosamente. El administrador lo verificará pronto.');
+                e.target.reset();
+                document.getElementById('advance-weeks-container').classList.add('hidden');
+                
+                // Reload profile to show new payment
+                await loadStudentProfile(studentId);
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        });
+    }
 }
