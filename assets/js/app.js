@@ -939,9 +939,23 @@ async function loadStudentProfile(studentId) {
                 ` : '<p class="text-gray-500 bg-gray-50 p-4 rounded-xl">No hay pagos registrados aún.</p>'}
             </div>
             
-            <!-- Reportar Pago -->
-            <div class="mt-6 bg-green-50 p-6 rounded-xl border border-green-200">
-                <h3 class="font-semibold text-green-800 mb-2">📢 Reportar Pago</h3>
+            <!-- Botón para mostrar formulario de Reportar Pago -->
+            <div class="mt-6">
+                <button onclick="togglePaymentForm()" class="w-full bg-green-600 text-white py-4 rounded-xl font-semibold hover:bg-green-700 transition flex items-center justify-center gap-2">
+                    <span>📢</span>
+                    <span>Reportar un Pago</span>
+                    <span id="payment-form-arrow">▼</span>
+                </button>
+            </div>
+            
+            <!-- Reportar Pago - Formulario oculto por defecto -->
+            <div id="payment-form-container" class="hidden mt-4 bg-green-50 p-6 rounded-xl border border-green-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-semibold text-green-800">Reportar Pago</h3>
+                    <button onclick="togglePaymentForm()" class="text-green-600 hover:text-green-800">
+                        ✕ Cerrar
+                    </button>
+                </div>
                 <p class="text-sm text-green-600 mb-4">Reporta tu pago para que el administrador lo verifique y registre.</p>
                 
                 <form id="student-report-payment-form" class="space-y-4">
@@ -1081,6 +1095,22 @@ function showStudentProfile(studentId) {
         return;
     }
     loadStudentProfile(studentId);
+}
+
+// Función para mostrar/ocultar formulario de pago
+function togglePaymentForm() {
+    const container = document.getElementById('payment-form-container');
+    const arrow = document.getElementById('payment-form-arrow');
+    
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        if (arrow) arrow.textContent = '▲';
+        // Scroll suave hacia el formulario
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        container.classList.add('hidden');
+        if (arrow) arrow.textContent = '▼';
+    }
 }
 
 // Setup payment report form event listeners
