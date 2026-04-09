@@ -1,5 +1,4 @@
 
-
 // ============================================
 // SETTINGS / CONFIGURATION
 // ============================================
@@ -49,6 +48,34 @@ async function getSettings() {
     }
 }
 
+// Update payment display info with actual settings
+async function updatePaymentDisplayInfo() {
+    const settings = await getSettings();
+    
+    // Update Pago Móvil info
+    const pagoMovilBanco = document.getElementById('display-pago-movil-banco');
+    const pagoMovilTelefono = document.getElementById('display-pago-movil-telefono');
+    const pagoMovilRif = document.getElementById('display-pago-movil-rif');
+    
+    if (pagoMovilBanco) pagoMovilBanco.textContent = settings.pago_movil_banco || 'No configurado';
+    if (pagoMovilTelefono) pagoMovilTelefono.textContent = settings.pago_movil_telefono || 'No configurado';
+    if (pagoMovilRif) pagoMovilRif.textContent = settings.pago_movil_rif || 'No configurado';
+    
+    // Update Binance info
+    const binanceId = document.getElementById('display-binance-id');
+    const binanceNetwork = document.getElementById('display-binance-network');
+    
+    if (binanceId) binanceId.textContent = settings.binance_id || 'No configurado';
+    if (binanceNetwork) binanceNetwork.textContent = settings.binance_network || 'TRC-20 (TRON)';
+    
+    // Update Efectivo info
+    const efectivoDireccion = document.getElementById('display-efectivo-direccion');
+    const efectivoHorario = document.getElementById('display-efectivo-horario');
+    
+    if (efectivoDireccion) efectivoDireccion.textContent = settings.efectivo_direccion || 'No configurado';
+    if (efectivoHorario) efectivoHorario.textContent = settings.efectivo_horario || 'No configurado';
+}
+
 // Handle settings form submission
 document.getElementById('settings-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -79,4 +106,9 @@ document.getElementById('settings-form')?.addEventListener('submit', async (e) =
     } catch (err) {
         showToast('Error guardando configuración: ' + err.message, 'error');
     }
+});
+
+// Auto-load settings when settings view is shown
+document.querySelector('[data-view="settings"]')?.addEventListener('click', () => {
+    loadSettings();
 });
