@@ -1005,11 +1005,41 @@ async function loadStudentProfile(studentId) {
                     </div>
                     
                     <div class="bg-white p-4 rounded-lg border border-green-200">
-                        <h4 class="font-medium text-green-800 mb-2">📋 Datos para tu Pago</h4>
-                        <div class="text-sm text-gray-600 space-y-1">
+                        <h4 class="font-medium text-green-800 mb-3">📋 Datos para tu Pago</h4>
+                        
+                        <div class="text-sm text-gray-600 space-y-2">
                             <p><span class="font-medium">Costo semanal:</span> $10 USD</p>
                             <p><span class="font-medium">Tu código:</span> <span class="font-mono bg-gray-100 px-2 py-1 rounded">${student.code || 'N/A'}</span></p>
-                            <p class="text-xs text-gray-500 mt-2">Incluye tu código como referencia al hacer el pago</p>
+                            <p class="text-xs text-gray-500">Incluye tu código como referencia al hacer el pago</p>
+                        </div>
+                        
+                        <div id="payment-details-info" class="mt-4 pt-4 border-t border-gray-200 hidden">
+                            <h5 class="font-medium text-gray-700 mb-2">Datos según método:</h5>
+                            
+                            <div id="pago-movil-info" class="hidden bg-blue-50 p-3 rounded-lg">
+                                <p class="font-medium text-blue-800">Pago Móvil</p>
+                                <div class="text-sm text-blue-700 mt-1 space-y-1">
+                                    <p>Banco: <span class="font-mono">[Configurar en admin]</span></p>
+                                    <p>Teléfono: <span class="font-mono">[Configurar en admin]</span></p>
+                                    <p>RIF: <span class="font-mono">[Configurar en admin]</span></p>
+                                </div>
+                            </div>
+                            
+                            <div id="binance-info" class="hidden bg-yellow-50 p-3 rounded-lg">
+                                <p class="font-medium text-yellow-800">Binance</p>
+                                <div class="text-sm text-yellow-700 mt-1">
+                                    <p>ID de Binance: <span class="font-mono">[Configurar en admin]</span></p>
+                                    <p class="text-xs mt-1">Red: TRC-20 (TRON) - fees más bajos</p>
+                                </div>
+                            </div>
+                            
+                            <div id="efectivo-info" class="hidden bg-green-50 p-3 rounded-lg">
+                                <p class="font-medium text-green-800">Efectivo</p>
+                                <div class="text-sm text-green-700 mt-1">
+                                    <p>Entregar en: <span class="font-mono">[Configurar sede]</span></p>
+                                    <p class="text-xs mt-1">Lunes a Viernes 8:00 AM - 5:00 PM</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -1068,6 +1098,34 @@ function setupPaymentReportForm(studentId, enrollments) {
         });
     });
     
+    // Show payment details based on method selected
+    const methodSelect = document.getElementById('student-payment-method');
+    if (methodSelect) {
+        methodSelect.addEventListener('change', (e) => {
+            const method = e.target.value;
+            const detailsContainer = document.getElementById('payment-details-info');
+            
+            // Hide all first
+            document.getElementById('pago-movil-info')?.classList.add('hidden');
+            document.getElementById('binance-info')?.classList.add('hidden');
+            document.getElementById('efectivo-info')?.classList.add('hidden');
+            
+            if (method) {
+                detailsContainer.classList.remove('hidden');
+                
+                if (method === 'pago_movil') {
+                    document.getElementById('pago-movil-info')?.classList.remove('hidden');
+                } else if (method === 'binance') {
+                    document.getElementById('binance-info')?.classList.remove('hidden');
+                } else if (method === 'cash_usd' || method === 'cash_bs') {
+                    document.getElementById('efectivo-info')?.classList.remove('hidden');
+                }
+            } else {
+                detailsContainer.classList.add('hidden');
+            }
+        });
+    }
+    
     // Handle form submission
     const form = document.getElementById('student-report-payment-form');
     if (form) {
@@ -1098,6 +1156,7 @@ function setupPaymentReportForm(studentId, enrollments) {
                 showToast('✅ Pago reportado exitosamente. El administrador lo verificará pronto.');
                 e.target.reset();
                 document.getElementById('advance-weeks-container').classList.add('hidden');
+                document.getElementById('payment-details-info').classList.add('hidden');
                 
                 // Reload profile to show new payment
                 await loadStudentProfile(studentId);
